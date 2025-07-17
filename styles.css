@@ -1,0 +1,154 @@
+/* styles.css */
+
+/* Общие стили */
+body {
+    font-family: 'Arial', sans-serif; /* Более универсальный шрифт */
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh; /* Занимает всю высоту видимой области */
+    background: linear-gradient(135deg, #f0f4f8, #d9e2ec); /* Градиентный фон */
+    color: #333;
+}
+
+.container {
+    background-color: #ffffff; /* Белый фон для контейнера */
+    border-radius: 15px; /* Скругленные углы */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); /* Мягкая тень */
+    width: 90%; /* Ширина на небольших экранах */
+    max-width: 600px; /* Максимальная ширина на больших экранах */
+    overflow: hidden; /* Скрываем все, что выходит за границы */
+    display: flex;
+    flex-direction: column;
+    height: 80vh; /* Фиксированная высота для чата */
+    max-height: 800px; /* Максимальная высота */
+}
+
+.title {
+    background-color: #ffcccc; /* Нежный розовый */
+    color: #fff;
+    padding: 20px;
+    font-size: 1.8em; /* Увеличенный размер шрифта */
+    font-weight: bold;
+    text-align: center;
+    border-bottom: 1px solid #ffaaaa; /* Разделитель */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* Стили для области чата */
+.chat-box {
+    flex-grow: 1; /* Занимает все доступное пространство */
+    padding: 20px;
+    overflow-y: auto; /* Прокрутка только внутри чата */
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* Отступ между сообщениями */
+    background-color: #f8fbfd; /* Очень светлый фон для чата */
+}
+
+/* Стили для отдельных сообщений */
+.message {
+    max-width: 80%; /* Сообщение не занимает всю ширину */
+    padding: 12px 18px;
+    border-radius: 20px; /* Более скругленные углы */
+    line-height: 1.5;
+    word-wrap: break-word; /* Перенос длинных слов */
+}
+
+.message.user {
+    background-color: #add8e6; /* Светло-голубой для пользователя */
+    color: #333;
+    align-self: flex-end; /* Выравнивание по правому краю */
+    border-bottom-right-radius: 5px; /* Немного меньше скругления в углу */
+}
+
+.message.bot {
+    background-color: #ffe0e6; /* Нежный розовый для бота */
+    color: #333;
+    align-self: flex-start; /* Выравнивание по левому краю */
+    border-bottom-left-radius: 5px; /* Немного меньше скругления в углу */
+}
+
+/* Стили для области ввода */
+.input-area {
+    display: flex;
+    padding: 20px;
+    border-top: 1px solid #eee; /* Разделитель */
+    background-color: #ffffff;
+    gap: 10px; /* Отступ между полем ввода и кнопкой */
+}
+
+#userinput {
+    flex-grow: 1; /* Занимает все доступное пространство */
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    border-radius: 25px; /* Сильное скругление */
+    font-size: 1em;
+    outline: none; /* Убираем стандартную обводку при фокусе */
+    transition: border-color 0.3s ease;
+}
+
+#userinput:focus {
+    border-color: #ffcccc; /* Изменение цвета рамки при фокусе */
+}
+
+#sendbtn {
+    background-color: #ffcccc; /* Нежный розовый */
+    color: white;
+    border: none;
+    border-radius: 25px; /* Сильное скругление */
+    padding: 12px 25px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    box-shadow: 0 4px 10px rgba(255, 204, 204, 0.5); /* Мягкая тень для кнопки */
+}
+
+#sendbtn:hover {
+    background-color: #ffaaaa; /* Темнее при наведении */
+    transform: translateY(-2px); /* Небольшой подъем при наведении */
+}
+
+#sendbtn:active {
+    transform: translateY(0); /* Возвращаем на место при клике */
+    box-shadow: 0 2px 5px rgba(255, 204, 204, 0.5);
+}
+
+/* Медиа-запросы для адаптивности */
+@media (max-width: 768px) {
+    .container {
+        width: 95%;
+        height: 90vh; /* Чуть больше высоты на мобильных */
+    }
+
+    .title {
+        font-size: 1.5em;
+        padding: 15px;
+    }
+
+    .chat-box {
+        padding: 15px;
+    }
+
+    .message {
+        padding: 10px 15px;
+        max-width: 90%;
+    }
+
+    .input-area {
+        flex-direction: column; /* Поле ввода и кнопка друг над другом */
+        gap: 8px;
+        padding: 15px;
+    }
+
+    #userinput {
+        border-radius: 15px;
+    }
+
+    #sendbtn {
+        width: 100%; /* Кнопка на всю ширину */
+        border-radius: 15px;
+    }
+}
