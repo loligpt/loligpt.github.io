@@ -8,7 +8,7 @@ const fetch = require('node-fetch'); // Импортируем node-fetch для
 exports.handler = async function(event, context) {
   // Получаем Hugging Face API токен из переменных окружения Netlify
   const HUGGING_FACE_API_TOKEN = process.env.HUGGING_FACE_API_TOKEN;
-  const API_URL = 'const API_URL = 'https://api-inference.huggingface.co/models/gpt2'; // Убедитесь, что это модель, которую вы хотите использовать
+  const API_URL = 'https://api-inference.huggingface.co/models/openai-community/gpt2'; // Убедитесь, что это модель, которую вы хотите использовать
 
   // Проверка наличия API токена (ВАЖНО для безопасности!)
   if (!HUGGING_FACE_API_TOKEN) {
