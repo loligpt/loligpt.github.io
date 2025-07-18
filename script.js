@@ -1,7 +1,3 @@
-// netlify/functions/generateReply.js
-const fetch = require('node-fetch'); // Import node-fetch
-require('dotenv').config(); // Load environment variables if using .env
-
 exports.handler = async function(event, context) {
   // Get the Hugging Face API token from environment variables
   const HUGGING_FACE_API_TOKEN = process.env.HUGGING_FACE_API_TOKEN;
