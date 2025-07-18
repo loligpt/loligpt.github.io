@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // !!! ВСТАВЬТЕ ВАШ АКТУАЛЬНЫЙ API-ТОКЕН HUGGING FACE ЗДЕСЬ !!!
     // Получите его на https://huggingface.co/settings/tokens
-    const HUGGING_FACE_API_TOKEN = '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'; 
+    const HUGGING_FACE_API_TOKEN = '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'; 
 
     // Конечная точка Hugging Face Inference API для более доступной модели
     // GPT-Neo 1.3B - хорошая модель для начала, GPT-J-6B может быть недоступна/слишком медленной для free tier.
