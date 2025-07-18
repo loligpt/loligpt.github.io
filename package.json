@@ -12,6 +12,6 @@
   "dependencies": {
     "node-fetch": "^2.6.7",
     "dotenv": "^16.0.0",
-    "@huggingface/inference": "^2.6.0" // <-- Добавьте эту строку
+    "@huggingface/inference": "^2.6.0"
   }
 }
