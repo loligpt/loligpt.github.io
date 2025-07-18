@@ -1,14 +1,15 @@
 // netlify/functions/generateReply.js
 // Этот файл выполняется на сервере Netlify (Node.js)
 
-const { HfInference } = require('@huggingface/inference'); // *** ИЗМЕНЕНО: Правильный импорт класса Inference
+const { HfInference } = require('@huggingface/inference'); // Импортируем HfInference
 const fetch = require('node-fetch'); // node-fetch все еще нужен для HfInference
 
 exports.handler = async function(event, context) {
   // Получаем Hugging Face API токен из переменных окружения Netlify
   const HUGGING_FACE_API_TOKEN = process.env.HUGGING_FACE_API_TOKEN;
-  // Инициализация клиента Inference (используем HfInference)
-  const client = new HfInference(HUGGING_FACE_API_TOKEN); // *** ИЗМЕНЕНО: Инициализация HfInference
+  
+  // Инициализация клиента HfInference
+  const client = new HfInference(HUGGING_FACE_API_TOKEN);
 
   // Проверка наличия API токена (ВАЖНО для безопасности!)
   if (!HUGGING_FACE_API_TOKEN) {
@@ -48,14 +49,14 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    // Вызов Chat Completion через HfInference и провайдера Nebius
+    // Вызов Chat Completion через HfInference с моделью TinyLlama
     const chatCompletion = await client.chatCompletion({
-        provider: "nebius", // Указываем провайдера Nebius AI
-        model: "mistralai/Mistral-Nemo-Instruct-2407", // Используем модель, поддерживаемую Nebius через HF
+        // provider: "nebius", // Этот параметр не нужен для обычной модели Hugging Face
+        model: "TinyLlama/TinyLlama-1.1B-Chat-v1.0", // <-- Используем TinyLlama
         messages: [
             { role: "user", content: prompt } // Передаем только текущее сообщение пользователя
         ],
-        // Дополнительные параметры генерации, если поддерживаются этой моделью через chatCompletion
+        // Дополнительные параметры генерации
         parameters: {
             max_new_tokens: 150,     
             temperature: 0.7,        
