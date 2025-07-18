@@ -1,87 +1,131 @@
-exports.handler = async function(event, context) {
-  // Get the Hugging Face API token from environment variables
-  const HUGGING_FACE_API_TOKEN = process.env.HUGGING_FACE_API_TOKEN;
-  const API_URL = 'https://api-inference.huggingface.co/models/EleutherAI/gpt-neo-1.3B';
+document.addEventListener('DOMContentLoaded', () => {
+    // Получаем ссылки на DOM-элементы
+    const chatbox = document.getElementById('chatbox');
+    const userInput = document.getElementById('userinput');
+    const sendBtn = document.getElementById('sendbtn');
 
-  // Check if the API token is available
-  if (!HUGGING_FACE_API_TOKEN) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Missing Hugging Face API token. Make sure to set the HUGGING_FACE_API_TOKEN environment variable in Netlify.' }),
-    };
-  }
+    // API_URL теперь указывает на вашу Netlify Function, а не напрямую на Hugging Face
+    const API_URL = '/.netlify/functions/generateReply';
 
-  // Extract the prompt from the request body
-  const { prompt } = JSON.parse(event.body);
+    // Массив для хранения истории диалога.
+    // Каждый объект содержит роль (user/bot) и контент сообщения.
+    let chatHistory = [];
 
-  // Check if the prompt is available
-  if (!prompt) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: 'Missing prompt in request body.' }),
-    };
-  }
+    /**
+     * Добавляет новое сообщение в чат.
+     * @param {string} text - Текст сообщения.
+     * @param {string} sender - Отправитель сообщения ('user' или 'bot').
+     * @param {string} [specialClass] - Дополнительный класс ('thinking' или 'error').
+     * @returns {HTMLElement} Созданный DOM-элемент сообщения.
+     */
+    function addMessage(text, sender, specialClass = '') {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', sender); // Базовый класс и класс отправителя
 
-  try {
-    // Call the Hugging Face API
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${HUGGING_FACE_API_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        inputs: prompt,
-        parameters: {
-          max_new_tokens: 150,
-          temperature: 0.7,
-          top_p: 0.9,
-          do_sample: true,
-          return_full_text: false,
-        },
-        options: { wait_for_model: true },
-      }),
+        if (specialClass) { // Если передан дополнительный класс
+            messageDiv.classList.add(specialClass);
+        }
+
+        messageDiv.textContent = text;       // Устанавливаем текстовое содержимое
+        chatbox.appendChild(messageDiv);     // Добавляем сообщение в чатбокс
+
+        // Прокручиваем чатбокс вниз, чтобы видеть последнее сообщение
+        chatbox.scrollTop = chatbox.scrollHeight;
+
+        return messageDiv; // Возвращаем ссылку на созданный div, чтобы его можно было удалить
+    }
+
+    /**
+     * Обрабатывает отправку сообщения пользователем.
+     */
+    async function sendMessage() {
+        const userMsg = userInput.value.trim(); // Получаем текст из поля ввода и удаляем лишние пробелы
+
+        if (userMsg === '') {
+            return; // Если сообщение пустое, ничего не делаем
+        }
+
+        // 1. Добавляем сообщение пользователя в чат
+        addMessage(userMsg, 'user');
+        // 2. Добавляем сообщение пользователя в историю диалога
+        chatHistory.push({ role: 'user', content: userMsg });
+
+        // 3. Очищаем поле ввода
+        userInput.value = '';
+
+        // 4. Добавляем временное сообщение "Loli-GPT печатает..."
+        const thinkingMessageDiv = addMessage('Loli-GPT печатает...', 'bot', 'thinking');
+        
+        try {
+            // 5. Генерируем ответ от Loli-GPT через Netlify Function
+            const botReply = await generateReply(userMsg); 
+
+            // 6. Удаляем временное сообщение "печатает..."
+            if (thinkingMessageDiv) { // Проверяем, что div всё ещё существует
+                thinkingMessageDiv.remove();
+            }
+
+            // 7. Добавляем ответ бота в чат
+            addMessage(botReply, 'bot');
+            // 8. Добавляем ответ бота в историю диалога
+            chatHistory.push({ role: 'bot', content: botReply });
+
+        } catch (error) {
+            // Обработка ошибок при получении ответа от API
+            console.error('Ошибка при получении ответа от Loli-GPT:', error);
+
+            // Удаляем временное сообщение "печатает..." в случае ошибки
+            if (thinkingMessageDiv) {
+                thinkingMessageDiv.remove();
+            }
+            // 9. Выводим сообщение об ошибке в чат
+            addMessage('Произошла ошибка: ' + error.message, 'bot', 'error');
+        }
+    }
+
+    /**
+     * Отправляет запрос к вашей Netlify Function для генерации ответа.
+     * @param {string} textPrompt - Текст для отправки в модель (последнее сообщение пользователя).
+     * @returns {Promise<string>} Сгенерированный текст ответа.
+     */
+    async function generateReply(textPrompt) {
+        // Отправляем запрос на нашу Netlify Function
+        const response = await fetch(API_URL, { // API_URL теперь указывает на вашу Netlify Function
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json' // Важно: Content-Type
+            },
+            // Отправляем только промпт, токен и параметры Hugging Face Function добавит сама
+            body: JSON.stringify({ prompt: textPrompt })
+        });
+
+        // Обработка ответа от Netlify Function
+        if (!response.ok) {
+            let errorMessage = '';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || response.statusText;
+            } catch (e) {
+                errorMessage = response.statusText || 'Неизвестная ошибка';
+            }
+            throw new Error(`Ошибка от прокси-сервера: ${response.status} - ${errorMessage}`);
+        }
+
+        const data = await response.json();
+        // Netlify Function возвращает объект с полем 'reply'
+        return data.reply || "Я не смог сгенерировать ответ.";
+    }
+
+    // Обработчик события для кнопки "Отправить"
+    sendBtn.addEventListener('click', sendMessage);
+
+    // Обработчик события для клавиши Enter в поле ввода
+    userInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
     });
 
-    // Check if the response is ok
-    if (!response.ok) {
-      let errorMessage = '';
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.error || response.statusText;
-      } catch (e) {
-        errorMessage = response.statusText || 'Unknown error';
-      }
-      throw new Error(`Hugging Face API error: ${response.status} - ${errorMessage}`);
-    }
-
-    // Parse the response
-    const data = await response.json();
-    let generatedText = '';
-    if (Array.isArray(data) && data[0] && data[0].generated_text) {
-      generatedText = data[0].generated_text;
-    } else if (data && data.generated_text) {
-      generatedText = data.generated_text;
-    }
-
-    // Clean up the generated text
-    generatedText = generatedText.replace(prompt, '').trim();
-    generatedText = generatedText.replace(/Пользователь:\s*/g, '').replace(/Loli-GPT:\s*/g, '').trim();
-    const newLineIndex = generatedText.indexOf('\n');
-    if (newLineIndex !== -1) {
-        generatedText = generatedText.substring(0, newLineIndex).trim();
-    }
-
-    // Return the generated text
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ reply: generatedText || 'No response from AI.' }),
-    };
-  } catch (error) {
-    console.error('Error:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
-    };
-  }
-};
+    // Приветственное сообщение от бота при загрузке страницы
+    addMessage('Привет! Я Loli-GPT. Чем могу помочь?', 'bot');
+});
