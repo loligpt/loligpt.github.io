@@ -1,22 +1,70 @@
 // netlify/functions/generateReply.js
 // Этот файл выполняется на сервере Netlify (Node.js)
 
-const { HfInference } = require('@huggingface/inference'); // Импортируем HfInference
-const fetch = require('node-fetch'); // node-fetch все еще нужен для HfInference
+// Для выполнения HTTP-запросов
+const fetch = require('node-fetch');
 
+// Глобальная переменная для хранения Access Token и времени его истечения
+let accessToken = null;
+let tokenExpiryTime = 0; // Время истечения токена в миллисекундах (Unix timestamp)
+
+// Ваш Authorization key для GigaChat
+const GIGACHAT_AUTHORIZATION_KEY = process.env.GIGACHAT_AUTHORIZATION_KEY;
+
+// URLs для GigaChat API
+const GIGACHAT_AUTH_URL = 'https://ngw.devices.sberbank.ru:9443/api/v2/oauth';
+// Этот URL для генерации текста нужно будет найти в документации GigaChat
+// В документации GigaChat ищите "Completion", "text generation" или "chat" endpoint.
+// Я использую гипотетический URL, который нужно будет заменить на реальный из документации.
+const GIGACHAT_COMPLETION_URL = 'https://ngw.devices.sberbank.ru:9443/api/v1/chat/completions'; // ГИПОТЕТИЧЕСКИЙ! ЗАМЕНИТЬ!
+
+// Функция для получения Access Token
+async function getAccessToken() {
+  // Проверяем, есть ли валидный токен (действителен еще хотя бы 5 минут)
+  if (accessToken && (Date.now() < tokenExpiryTime - 5 * 60 * 1000)) {
+    return accessToken;
+  }
+
+  // Если токена нет или он просрочен, запрашиваем новый
+  console.log('Запрашиваю новый Access Token для GigaChat...');
+  try {
+    const response = await fetch(GIGACHAT_AUTH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'RqUID': 'YOUR_UNIQUE_REQUEST_ID', // TODO: Замените на уникальный ID запроса (UUID)
+        'Authorization': `Basic ${GIGACHAT_AUTHORIZATION_KEY}` // Ваш Authorization key
+      },
+      body: 'scope=GIGACHAT_API_PERS' // Scope, указанный в документации
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Ошибка получения токена: ${response.status} - ${errorData.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    accessToken = data.access_token;
+    // Токен действует 30 минут, преобразуем в миллисекунды для Date.now()
+    tokenExpiryTime = Date.now() + (data.expires_at || 30 * 60) * 1000;
+    console.log('Access Token успешно получен.');
+    return accessToken;
+
+  } catch (error) {
+    console.error('Ошибка в getAccessToken:', error);
+    throw new Error('Не удалось получить Access Token для GigaChat: ' + error.message);
+  }
+}
+
+// Главная функция-обработчик для Netlify
 exports.handler = async function(event, context) {
-  // Получаем Hugging Face API токен из переменных окружения Netlify
-  const HUGGING_FACE_API_TOKEN = process.env.HUGGING_FACE_API_TOKEN;
-  
-  // Инициализация клиента HfInference
-  const client = new HfInference(HUGGING_FACE_API_TOKEN);
-
-  // Проверка наличия API токена (ВАЖНО для безопасности!)
-  if (!HUGGING_FACE_API_TOKEN) {
-    console.error('HUGGING_FACE_API_TOKEN is not set in Netlify Environment Variables.');
+  // Проверка наличия Authorization key
+  if (!GIGACHAT_AUTHORIZATION_KEY) {
+    console.error('GIGACHAT_AUTHORIZATION_KEY is not set in Netlify Environment Variables.');
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Серверная ошибка: API токен не настроен.' }),
+      body: JSON.stringify({ error: 'Серверная ошибка: GigaChat Authorization key не настроен.' }),
     };
   }
 
@@ -49,25 +97,39 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    // Вызов Chat Completion через HfInference с моделью TinyLlama
-    const chatCompletion = await client.chatCompletion({
-        // provider: "nebius", // Этот параметр не нужен для обычной модели Hugging Face
-        model: "TinyLlama/TinyLlama-1.1B-Chat-v1.0", // <-- Используем TinyLlama
-        messages: [
-            { role: "user", content: prompt } // Передаем только текущее сообщение пользователя
-        ],
-        // Дополнительные параметры генерации
-        parameters: {
-            max_new_tokens: 150,     
-            temperature: 0.7,        
-            top_p: 0.9,              
-            do_sample: true,         
-        },
-        options: { wait_for_model: true },
+    // 1. Получаем Access Token
+    const currentAccessToken = await getAccessToken();
+
+    // 2. Отправляем запрос к GigaChat API для генерации текста
+    const response = await fetch(GIGACHAT_COMPLETION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${currentAccessToken}` // Используем полученный Access Token
+      },
+      // Формат тела запроса для генерации текста - это то, что нужно найти в документации
+      // Это примерный формат для Chat Completion API.
+      body: JSON.stringify({
+        model: "GigaChat", // Имя модели, если требуется
+        messages: [{
+          role: "user",
+          content: prompt
+        }],
+        // Другие параметры, если они есть и нужны
+        // Например: temperature: 0.7, max_tokens: 150
+      })
     });
 
-    // Извлечение сгенерированного текста из ответа
-    let generatedText = chatCompletion.choices[0]?.message?.content || "Не удалось получить ответ от ИИ.";
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Ошибка GigaChat API: ${response.status} - ${errorData.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    // Как получить сгенерированный текст из ответа GigaChat API - нужно смотреть в документации
+    // Это примерный вариант для Chat Completion API.
+    const generatedText = data.choices[0]?.message?.content || "Не удалось получить ответ от GigaChat.";
 
     // Возвращаем ответ обратно на фронтенд
     return {
@@ -78,22 +140,12 @@ exports.handler = async function(event, context) {
       },
       body: JSON.stringify({ reply: generatedText }),
     };
+
   } catch (error) {
     console.error('Ошибка в Netlify Function:', error);
-    // Обработка ошибок, которые могут возникнуть от HfInference
-    let errorMessage = "Серверная ошибка.";
-    if (error.message) {
-        errorMessage = `Серверная ошибка: ${error.message}`;
-    } else if (error.response && error.response.status) {
-        errorMessage = `Ошибка API: ${error.response.status} - ${error.response.statusText || 'Неизвестно'}`;
-    }
     return {
       statusCode: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*' // Разрешить запросы с любого домена (CORS)
-      },
-      body: JSON.stringify({ error: errorMessage }),
+      body: JSON.stringify({ error: `Серверная ошибка: ${error.message}` }),
     };
   }
 };
