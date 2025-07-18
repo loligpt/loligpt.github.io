@@ -1,0 +1,16 @@
+{
+  "name": "loli-gpt-functions",
+  "version": "1.0.0",
+  "description": "Netlify functions for Loli-GPT",
+  "main": "netlify/functions/generateReply.js",
+  "scripts": {
+    "start": "netlify dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "node-fetch": "^2.6.7",
+    "dotenv": "^16.0.0"
+  }
+}
