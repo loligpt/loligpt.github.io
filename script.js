@@ -4,14 +4,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const userInput = document.getElementById('userinput');
     const sendBtn = document.getElementById('sendbtn');
 
-    // !!! Вставьте ваш API-токен Hugging Face здесь !!!
-    // Убедитесь, что это ваш актуальный токен.
-    const HUGGING_FACE_API_TOKEN = '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'; 
+    // !!! ВСТАВЬТЕ ВАШ АКТУАЛЬНЫЙ API-ТОКЕН HUGGING FACE ЗДЕСЬ !!!
+    // Получите его на https://huggingface.co/settings/tokens
+    const HUGGING_FACE_API_TOKEN = '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'; 
 
-    // Конечная точка Hugging Face Inference API для модели EleutherAI/gpt-j-6B
-    const HUGGING_FACE_API_URL = 'https://api-inference.huggingface.co/models/EleutherAI/gpt-j-6B';
+    // Конечная точка Hugging Face Inference API для более доступной модели
+    // GPT-Neo 1.3B - хорошая модель для начала, GPT-J-6B может быть недоступна/слишком медленной для free tier.
+    const API_URL = 'https://api-inference.huggingface.co/models/EleutherAI/gpt-neo-1.3B';
 
-    // Массив для хранения истории диалога. 
+    // Массив для хранения истории диалога.
     // Каждый объект содержит роль (user/bot) и контент сообщения.
     let chatHistory = [];
 
@@ -19,19 +20,24 @@ document.addEventListener('DOMContentLoaded', () => {
      * Добавляет новое сообщение в чат.
      * @param {string} text - Текст сообщения.
      * @param {string} sender - Отправитель сообщения ('user' или 'bot').
+     * @param {string} [specialClass] - Дополнительный класс ('thinking' или 'error').
      * @returns {HTMLElement} Созданный DOM-элемент сообщения.
      */
-    function addMessage(text, sender) {
+    function addMessage(text, sender, specialClass = '') {
         const messageDiv = document.createElement('div');
-        messageDiv.classList.add('message'); // Базовый класс для всех сообщений
-        messageDiv.classList.add(sender);    // Класс отправителя ('user' или 'bot')
+        messageDiv.classList.add('message', sender); // Базовый класс и класс отправителя
+
+        if (specialClass) { // Если передан дополнительный класс
+            messageDiv.classList.add(specialClass);
+        }
+
         messageDiv.textContent = text;       // Устанавливаем текстовое содержимое
         chatbox.appendChild(messageDiv);     // Добавляем сообщение в чатбокс
 
         // Прокручиваем чатбокс вниз, чтобы видеть последнее сообщение
         chatbox.scrollTop = chatbox.scrollHeight;
 
-        return messageDiv; // Возвращаем ссылку на созданный div, это важно для "печатает..." индикатора
+        return messageDiv; // Возвращаем ссылку на созданный div, чтобы его можно было удалить
     }
 
     /**
@@ -52,16 +58,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // 3. Очищаем поле ввода
         userInput.value = '';
 
-        // 4. Добавляем временное сообщение "Loli-GPT печатает..." и соответствующий класс
-        const thinkingMessageDiv = addMessage('Loli-GPT печатает...', 'bot');
-        thinkingMessageDiv.classList.add('thinking'); // Добавляем класс 'thinking' для анимации и стилизации
-
+        // 4. Добавляем временное сообщение "Loli-GPT печатает..."
+        const thinkingMessageDiv = addMessage('Loli-GPT печатает...', 'bot', 'thinking');
+        
         try {
             // 5. Генерируем ответ от Loli-GPT через Hugging Face API
-            const botReply = await generateReply(chatHistory);
+            // Для GPT-Neo 1.3B (и подобных) лучше передавать только последний промпт,
+            // или очень короткую историю, иначе модель может "забыть" суть.
+            const botReply = await generateReply(userMsg); 
 
             // 6. Удаляем временное сообщение "печатает..."
-            if (thinkingMessageDiv) {
+            if (thinkingMessageDiv) { // Проверяем, что div всё ещё существует
                 thinkingMessageDiv.remove();
             }
 
@@ -79,74 +86,72 @@ document.addEventListener('DOMContentLoaded', () => {
                 thinkingMessageDiv.remove();
             }
             // 9. Выводим сообщение об ошибке в чат
-            addMessage('Произошла ошибка при получении ответа. Пожалуйста, попробуйте еще раз.', 'bot error');
+            addMessage('Произошла ошибка: ' + error.message, 'bot', 'error');
         }
     }
 
     /**
      * Отправляет запрос к Hugging Face API для генерации ответа.
-     * @param {Array<Object>} history - История диалога для формирования промпта.
+     * @param {string} textPrompt - Текст для отправки в модель (последнее сообщение пользователя).
      * @returns {Promise<string>} Сгенерированный текст ответа.
      */
-    async function generateReply(history) {
-        // Формируем единый промпт из всей истории диалога, 
-        // так как GPT-J не поддерживает массив сообщений напрямую.
-        const fullPrompt = history.map(msg => {
-            if (msg.role === 'user') {
-                return `Пользователь: ${msg.content}`;
-            } else {
-                return `Loli-GPT: ${msg.content}`;
-            }
-        }).join('\n') + '\nLoli-GPT:'; // Добавляем "Loli-GPT:" в конце, чтобы модель продолжила генерацию от своего имени
-
-        // Отправляем POST-запрос к Hugging Face Inference API
-        const response = await fetch(HUGGING_FACE_API_URL, {
+    async function generateReply(textPrompt) {
+        const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${HUGGING_FACE_API_TOKEN}`, // Ваш API-токен
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                inputs: fullPrompt,
+                inputs: textPrompt, // Отправляем только последнее сообщение пользователя как input
                 parameters: {
-                    max_new_tokens: 150,     // Максимальное количество новых токенов в ответе
+                    max_new_tokens: 150,     // Максимальное количество новых токенов
                     temperature: 0.7,        // Степень случайности/креативности (от 0.0 до 1.0)
                     top_p: 0.9,              // Выборка токенов с кумулятивной вероятностью до 0.9
-                    do_sample: true,         // Включение случайной выборки (для более разнообразных ответов)
+                    do_sample: true,         // Включение случайной выборки
                     return_full_text: false  // Возвращать только сгенерированный текст, без входного промпта
+                },
+                options: {
+                    wait_for_model: true // Важно: дождаться загрузки модели, если она спит (для free tier)
                 }
             })
         });
 
         // Проверяем статус ответа от API
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`API error: ${response.status} ${response.statusText} - ${JSON.JSON.stringify(errorData)}`);
+            let errorMessage = '';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || response.statusText;
+            } catch (e) {
+                errorMessage = response.statusText || 'Неизвестная ошибка';
+            }
+            throw new Error(`API: ${response.status} - ${errorMessage}`);
         }
 
         const data = await response.json();
-        let generatedText = data[0].generated_text;
+        let generatedText = '';
 
-        // Пост-обработка сгенерированного текста:
-        // Убираем возможные повторения промпта или начала следующего диалога.
-        const promptEndIndex = fullPrompt.lastIndexOf('Loli-GPT:');
-        if (generatedText.startsWith(fullPrompt.substring(promptEndIndex))) {
-            generatedText = generatedText.length > fullPrompt.substring(promptEndIndex).length ? generatedText.substring(fullPrompt.substring(promptEndIndex).length).trim() : '';
+        // Hugging Face Inference API может возвращать ответ в разных форматах,
+        // в зависимости от модели и версии API. Парсим результат.
+        if (Array.isArray(data) && data[0] && data[0].generated_text) {
+             generatedText = data[0].generated_text;
+        } else if (data && data.generated_text) {
+             generatedText = data.generated_text;
         }
 
-        // Обрезаем текст до первого переноса строки или до следующего "Пользователь:"
-        const newLineIndex = generatedText.indexOf('\n');
-        const userPrefixIndex = generatedText.indexOf('Пользователь:');
-        let trimIndex = generatedText.length;
-
-        if (newLineIndex !== -1 && newLineIndex < trimIndex) {
-            trimIndex = newLineIndex;
+        // Пост-обработка: удаляем из начала сгенерированного текста входной промпт,
+        // т.к. return_full_text: false не всегда работает идеально для всех моделей.
+        if (generatedText.startsWith(textPrompt)) {
+            generatedText = generatedText.substring(textPrompt.length).trim();
         }
-        if (userPrefixIndex !== -1 && userPrefixIndex < trimIndex) {
-            trimIndex = userPrefixIndex;
-        }
-        generatedText = generatedText.substring(0, trimIndex).trim();
 
+        // Дополнительная очистка от мусора, который иногда генерируют LLM (например, "Пользователь:")
+        generatedText = generatedText.replace(/Пользователь:\s*/g, '')
+                                     .replace(/Loli-GPT:\s*/g, '')
+                                     .trim();
+
+        // Возвращаем сгенерированный текст или сообщение по умолчанию
         return generatedText || "Я не смог сгенерировать ответ.";
     }
 
